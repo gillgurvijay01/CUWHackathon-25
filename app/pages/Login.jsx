@@ -14,7 +14,6 @@ import {
 } from "@react-navigation/native";
 export default function Login() {
   const navigation = useNavigation();
-
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>Vijay</Text>
@@ -36,6 +35,12 @@ export default function Login() {
       >
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
+      <View style={styles.signupContainer}>
+        <Text style={styles.signupText}>If you don't have an account </Text>
+        <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>
+          <Text style={styles.signupLink}>Sign Up</Text>
+        </TouchableOpacity>
+      </View>
       <StatusBar style="auto" />
     </View>
   );

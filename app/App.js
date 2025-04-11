@@ -5,14 +5,14 @@ import { SplashScreen } from './assets/Splash';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import Feed from "./pages/Feed";
-
+import Signup from './pages/Signup';
 const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Home">
-        <Stack.Screen name="SignUp" component={Login} />
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen name="SignUp" component={Signup} />
         <Stack.Screen name="Home" component={Home} />
         <Stack.Screen name="Feed" component={Feed} />
         <Stack.Screen name="Login" component={Login} />

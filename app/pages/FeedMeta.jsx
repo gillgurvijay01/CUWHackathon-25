@@ -4,6 +4,8 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import uuid from "react-native-uuid";
 import NewsArticle from "../Components/NewsArticle";
+import META_NEWS_API_URL from "../config/GlobalConfig";
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -11,7 +13,7 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-const Feed = () => {
+const FeedMeta = () => {
   const [expoPushToken, setExpoPushToken] = useState("");
   const notificationListener = useRef();
   const responseListener = useRef();
@@ -20,9 +22,7 @@ const Feed = () => {
 
   const fetchData = async () => {
     try {
-      const response = await fetch(
-        "https://rss.app/feeds/v1.1/hyApoiRn3WYZEzgw.json"
-      );
+      const response = await fetch(`${META_NEWS_API_URL}`);
       const json = await response.json();
       setData(json);
     } catch (error) {
@@ -54,14 +54,20 @@ const Feed = () => {
     };
   }, []);
   const sendTestNotification = async () => {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Test Notification 📬",
-        body: "Hello from your Expo app!",
-        data: { testData: "123" },
-      },
-      trigger: { seconds: 2 },
-    });
+    if (data.items && data.items.length > 0) {
+      const randomArticle =
+        data.items[Math.floor(Math.random() * data.items.length)];
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: randomArticle.title || "Random Article Notification",
+          body: randomArticle.summary || "Check out this article!",
+          data: { articleId: randomArticle.id },
+        },
+        trigger: { seconds: 2 },
+      });
+    } else {
+      console.log("No articles available to send a notification.");
+    }
   };
   const renderItem = ({ item }) => (
     <View style={styles.itemContainer}>
@@ -85,24 +91,6 @@ const Feed = () => {
     </View>
   );
 
-  const sendRandomArticleNotification = async () => {
-    if (data.items && data.items.length > 0) {
-      const randomIndex = Math.floor(Math.random() * data.items.length);
-      const randomArticle = data.items[randomIndex];
-
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: randomArticle.title || "New Article",
-          body: randomArticle.summary || "Check out this article!",
-          data: { url: randomArticle.link },
-        },
-        trigger: { seconds: 2 },
-      });
-    } else {
-      alert("No articles available to send as a notification.");
-    }
-  };
-
   return (
     <View style={styles.container}>
       <Text style={styles.header}>This is feed screen</Text>
@@ -111,26 +99,10 @@ const Feed = () => {
         renderItem={renderItem}
         keyExtractor={() => uuid.v4()}
       />
-      <View
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          backgroundColor: "#fff",
-          padding: 16,
-          borderTopWidth: 1,
-          borderTopColor: "#ccc",
-          alignItems: "center",
-        }}
-      >
+      <View>
         <Text>Your Expo Push Token:</Text>
         <Text selectable>{expoPushToken}</Text>
-        <Button title="Send Test Notification" onPress={sendTestNotification} />
-        <Button
-          title="Send Random Article Notification"
-          onPress={sendRandomArticleNotification}
-        />
+        <Button title="Push Me Daddy" onPress={sendTestNotification} />
       </View>
     </View>
   );
@@ -218,4 +190,4 @@ async function registerForPushNotificationsAsync() {
 
   return token;
 }
-export default Feed;
+export default FeedMeta;
