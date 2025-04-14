@@ -6,26 +6,57 @@ import {
   TextInput,
   TouchableOpacity,
   SafeAreaView,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   Alert,
 } from "react-native";
-import {
-  createStaticNavigation,
-  useNavigation,
-} from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
+
 const Signup = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selectedOrgs, setSelectedOrgs] = useState([]);
 
   const navigation = useNavigation();
 
+  const organizations = [
+    "Aurora WDC",
+    "Concordia University-Wisconsin (CUW)",
+    "Meta",
+    "Google",
+    "Microsoft",
+  ];
+
+  const toggleOrganization = (org) => {
+    if (selectedOrgs.includes(org)) {
+      setSelectedOrgs(selectedOrgs.filter((item) => item !== org));
+    } else {
+      if (selectedOrgs.length < 3) {
+        setSelectedOrgs([...selectedOrgs, org]);
+      } else {
+        Alert.alert("Limit Reached", "You can select up to 3 organizations");
+      }
+    }
+  };
+
   const handleSignup = async () => {
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert("Error", "Please enter a valid email address");
+      return;
+    }
+
+    // Password validation - at least 8 characters
+    if (password.length < 8) {
+      Alert.alert("Error", "Password must be at least 8 characters long");
+      return;
+    }
+
     // Basic validation
     if (!username || !email || !password || !confirmPassword) {
       Alert.alert("Error", "Please fill all fields");
@@ -34,6 +65,12 @@ const Signup = () => {
 
     if (password !== confirmPassword) {
       Alert.alert("Error", "Passwords do not match");
+      return;
+    }
+
+    // Organization validation
+    if (selectedOrgs.length < 1 || selectedOrgs.length > 3) {
+      Alert.alert("Error", "Please select between 1-3 organizations");
       return;
     }
 
@@ -71,17 +108,6 @@ const Signup = () => {
 
           <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Username</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your username"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Email</Text>
               <TextInput
                 style={styles.input}
@@ -94,7 +120,20 @@ const Signup = () => {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
+              <Text style={styles.inputLabel}>Username</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your username"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>
+                Password (minimum 8 characters)
+              </Text>
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
@@ -104,35 +143,61 @@ const Signup = () => {
               />
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Confirm Password</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-              />
+            <View style={styles.inputContainer}></View>
+            <Text style={styles.inputLabel}>Confirm Password</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm your password"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Select Organizations (1-3):</Text>
+            <Text style={styles.selectedCount}>
+              Selected: {selectedOrgs.length}/3
+            </Text>
+            <View style={styles.orgsContainer}>
+              {organizations.map((org, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.orgItem,
+                    selectedOrgs.includes(org) && styles.orgItemSelected,
+                  ]}
+                  onPress={() => toggleOrganization(org)}
+                >
+                  <Text
+                    style={[
+                      styles.orgItemText,
+                      selectedOrgs.includes(org) && styles.orgItemTextSelected,
+                    ]}
+                  >
+                    {org}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleSignup}
-              disabled={loading}
-            >
-              <Text style={styles.buttonText}>
-                {loading ? "Creating Account..." : "Sign Up"}
-              </Text>
-            </TouchableOpacity>
           </View>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account?</Text>
-            <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-              <Text style={styles.footerLink}>Login</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={handleSignup}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>
+              {loading ? "Creating Account..." : "Sign Up"}
+            </Text>
+          </TouchableOpacity>
         </ScrollView>
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Already have an account?</Text>
+          <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+            <Text style={styles.footerLink}>Login</Text>
+          </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -198,10 +263,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  orgsContainer: {
+    marginTop: 8,
+  },
+  orgItem: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    marginBottom: 8,
+    backgroundColor: "#F6F6F6",
+  },
+  orgItemSelected: {
+    backgroundColor: "#E1EBFF",
+    borderColor: "#4B7BEC",
+  },
+  orgItemText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  orgItemTextSelected: {
+    color: "#4B7BEC",
+    fontWeight: "600",
+  },
+  selectedCount: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 8,
+  },
   footer: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
+    padding: 5,
   },
   footerText: {
     color: "#666",

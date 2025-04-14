@@ -16,7 +16,7 @@ export default function Login() {
   const navigation = useNavigation();
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>Vijay</Text>
+      <Text style={styles.logo}>Feed Login</Text>
       <TextInput
         style={styles.input}
         placeholder="Username"
@@ -35,10 +35,10 @@ export default function Login() {
       >
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
-      <View style={styles.signupContainer}>
-        <Text style={styles.signupText}>If you don't have an account </Text>
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Don't have an account?</Text>
         <TouchableOpacity onPress={() => navigation.navigate("SignUp")}>
-          <Text style={styles.signupLink}>Sign Up</Text>
+          <Text style={styles.footerLink}>Sign Up</Text>
         </TouchableOpacity>
       </View>
       <StatusBar style="auto" />
@@ -83,5 +83,22 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 5,
+    marginTop: 20,
+  },
+  footerText: {
+    color: "#666",
+    fontSize: 14,
+  },
+  footerLink: {
+    color: "#4B7BEC",
+    fontSize: 14,
+    fontWeight: "bold",
+    marginLeft: 5,
   },
 });
