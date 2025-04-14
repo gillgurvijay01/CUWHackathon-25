@@ -4,28 +4,22 @@ const bcrypt = require('bcryptjs');
 const registerUser = async (req, res) => {
   try {
     const { username, email, password, preferences } = req.body;
-    
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
-    
     if (preferences && preferences.length > 3) {
       return res.status(400).json({ message: 'Maximum 3 preferences allowed' });
     }
-    
     const hashedPassword = await bcrypt.hash(password, 10);
-    
     const user = new User({
       username,
       email,
       password: hashedPassword,
       preferences: preferences || []
     });
-    
     await user.save();
-    
-    res.status(201).json({ 
+    res.status(201).json({
       message: 'User registered successfully',
       user: {
         id: user._id,
@@ -42,18 +36,17 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    
-    res.json({ 
+
+    res.json({
       message: 'Login successful',
       user: {
         id: user._id,
@@ -70,12 +63,12 @@ const loginUser = async (req, res) => {
 const getUserPreferences = async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     res.json({
       preferences: user.preferences
     });
@@ -88,25 +81,25 @@ const updatePreferences = async (req, res) => {
   try {
     const { userId } = req.params;
     const { preferences } = req.body;
-    
+
     if (!preferences) {
       return res.status(400).json({ message: 'Preferences are required' });
     }
-    
+
     if (preferences.length > 3) {
       return res.status(400).json({ message: 'Maximum 3 preferences allowed' });
     }
-    
+
     const user = await User.findByIdAndUpdate(
       userId,
       { preferences },
       { new: true }
     );
-    
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     res.json({
       message: 'Preferences updated successfully',
       preferences: user.preferences
@@ -119,7 +112,7 @@ const updatePreferences = async (req, res) => {
 const saveArticle = async (req, res) => {
   try {
     const { articleId } = req.body;
-    
+
     if (!articleId) {
       return res.status(400).json({ message: 'Article ID is required' });
     }
@@ -135,11 +128,11 @@ const saveArticle = async (req, res) => {
 const markArticleAsRead = async (req, res) => {
   try {
     const { articleId } = req.body;
-    
+
     if (!articleId) {
       return res.status(400).json({ message: 'Article ID is required' });
     }
-    
+
     res.json({
       message: 'Article marked as read',
       articleId

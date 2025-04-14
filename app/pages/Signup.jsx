@@ -12,7 +12,7 @@ import {
   Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-
+import { nodeUrl } from "../config/GlobalConfig";
 const Signup = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
@@ -77,8 +77,27 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      // Here you would call your API to register the user
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Prepare request payload
+      const payload = {
+        username,
+        email,
+        password,
+        preferences: selectedOrgs,
+      };
+
+      // API request
+      const response = await fetch(`${nodeUrl}/users/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        Alert.alert("Failed", "Die");
+        throw new Error("Server responded with an error");
+      }
 
       Alert.alert("Success", "Account created successfully");
       navigation.navigate("Login");
@@ -244,12 +263,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#F6F6F6",
+    width: "100%",
+    height: 50,
+    backgroundColor: "#fff",
     borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
+    paddingHorizontal: 15,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#ddd",
   },
   button: {
     backgroundColor: "#4B7BEC",
