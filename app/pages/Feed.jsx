@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, Button, Image } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import uuid from "react-native-uuid";
+import { CUW_NEWS_API_URL } from "../config/GlobalConfig";
 import NewsArticle from "../Components/NewsArticle";
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -20,9 +21,7 @@ const Feed = () => {
 
   const fetchData = async () => {
     try {
-      const response = await fetch(
-        "https://rss.app/feeds/v1.1/hyApoiRn3WYZEzgw.json"
-      );
+      const response = await fetch(`${CUW_NEWS_API_URL}`);
       const json = await response.json();
       setData(json);
     } catch (error) {
