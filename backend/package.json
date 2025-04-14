@@ -12,10 +12,12 @@
   "license": "ISC",
   "description": "Backend server for RSS feed application",
   "dependencies": {
+    "@react-native-async-storage/async-storage": "^2.1.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.8.6"
   },
   "devDependencies": {

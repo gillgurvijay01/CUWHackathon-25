@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { validateUserRegistration } = require('../middleware/validator');
-const { 
-  registerUser, 
-  loginUser, 
-  getUserPreferences, 
+const {
+  registerUser,
+  loginUser,
+  getUserPreferences,
   updatePreferences
 } = require('../controllers/userController');
 

@@ -16,16 +16,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
-  next();
-});
+// app.use((req, res, next) => {
+//   console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
+//   next();
+// });
 
 
 app.get('/', (req, res) => {
   res.json({ message: 'RSS Feed API is running!' });
 });
 
+app.get('/api', (req, res) => {
+  res.json({ message: 'API is running!' });
+}
+);
 
 app.use('/api/users', userRoutes);
 app.use((req, res, next) => {

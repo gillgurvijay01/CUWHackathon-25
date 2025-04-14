@@ -1,6 +1,6 @@
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
-
+const jsonwebtoken = require('jsonwebtoken');
 const registerUser = async (req, res) => {
   try {
     const { username, email, password, preferences } = req.body;
@@ -35,17 +35,18 @@ const registerUser = async (req, res) => {
 
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const { username, password } = req.body;
+    if (!username || !password) {
+      res.status(400).json({ message: 'Username and password are required' });
+    }
+    const user = await User.findOne({ username });
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-
     res.json({
       message: 'Login successful',
       user: {
@@ -54,7 +55,7 @@ const loginUser = async (req, res) => {
         email: user.email,
         preferences: user.preferences
       }
-    });
+    }).status(200);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }

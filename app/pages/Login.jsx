@@ -6,14 +6,55 @@ import {
   TextInput,
   View,
   TouchableOpacity,
+  Alert,
 } from "react-native";
 import { nanoid } from "nanoid";
 import {
   createStaticNavigation,
   useNavigation,
 } from "@react-navigation/native";
+import { nodeUrl } from "../config/GlobalConfig";
+import { storeToken } from "../auth/auth";
 export default function Login() {
   const navigation = useNavigation();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSignin = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${nodeUrl}/users/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (response.status !== 200) {
+        Alert.alert("Invalid credentials");
+        setLoading(false);
+        return;
+      }
+
+      const data = await response.json(); // assuming response returns { token, user }
+
+      if (response.status === 200) {
+        storeToken(JSON.stringify(data.user)); // Store token in AsyncStorage
+        Alert.alert("Success", "Login successful");
+        navigation.replace("Feed"); // replace prevents going back to Login
+      } else {
+        Alert.alert("Error", "Token not received");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      Alert.alert("Error", "Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.logo}>Feed Login</Text>
@@ -21,19 +62,26 @@ export default function Login() {
         style={styles.input}
         placeholder="Username"
         placeholderTextColor="#aaa"
+        value={username}
+        onChangeText={(text) => setUsername(text)}
       />
       <TextInput
         style={styles.input}
         placeholder="Password"
         placeholderTextColor="#aaa"
+        value={password}
+        onChangeText={(text) => setPassword(text)}
         secureTextEntry
       />
 
       <TouchableOpacity
         style={styles.button}
-        onPress={() => navigation.navigate("Feed")}
+        onPress={handleSignin}
+        disabled={loading}
       >
-        <Text style={styles.buttonText}>Login</Text>
+        <Text style={styles.buttonText}>
+          {loading ? "Logging in Account..." : "Login"}
+        </Text>
       </TouchableOpacity>
       <View style={styles.footer}>
         <Text style={styles.footerText}>Don't have an account?</Text>
