@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-
 const UserSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -27,7 +26,7 @@ const UserSchema = new mongoose.Schema({
       validator: function(v) {
         return v.length <= 3;
       },
-      message: 'You can select maximum 3 preferences'
+      message: 'You can select maximum 3 company preferences'
     }
   },
   created_at: {
