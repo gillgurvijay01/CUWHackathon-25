@@ -8,48 +8,89 @@ Date: Thursday, April 10th
 
 Time: 4:00pm - 9:00pm CST
 
-## Challenge Overview
+# Our Solution: RSS Feed Aggregator Mobile App
 
-In this Hackathon, teams will compete to create a mobile app (preferably using React) that redefines how users consume and interact with content. Your app should seamlessly integrate multiple functionalities to deliver a personalized and engaging experience.
+## Project Overview
 
-**Key Objectives:**
+We've created a mobile app using React Native (Expo) that aggregates RSS feeds based on user preferences. The app fetches content from multiple company RSS sources, allows users to personalize their feed experience by selecting companies of interest, and presents content in a clean, organized manner.
 
-- **RSS Feed Integration:**  
-  Build a feature that aggregates and displays content from one or more RSS feeds.
+### Key Features
 
-- **Role-Based Access:**  
-  Implement a system to group users by roles, allowing for tailored access to specific types of feeds.
+- **User Authentication**: Register and login functionality for personalized experiences
+- **Company-Based Feed Aggregation**: Users can select up to 3 companies to customize their feed content
+- **Sorted Content**: All feeds are automatically sorted by date/time for the most relevant experience
+- **Company Filtering**: Users can discover content through company-based navigation
+- **RSS Feed Management**: Admin functionality to add, update, or remove feed sources
 
-- **Notification Functionality:**  
-  Develop a dynamic notification system to alert users of new content and important updates.
+## Technical Architecture
 
-Additional details and guidelines will be provided on the day of the Hackathon.
+Our solution consists of:
 
-## Requirements
+1. **Backend API**: Node.js/Express server with MongoDB database
+   - RESTful API for user management, feed aggregation, and preference-based content delivery
+   - RSS feed fetching and processing via Axios
+   - Data storage using MongoDB (users, preferences, feed sources)
 
-For this challenge, you'll build a mobile app that integrates RSS feeds, implements role-based access, and features a robust notification system. You may choose the technology stack that best fits your team’s expertise. Consider the following resources for guidance:
+2. **Mobile App**: React Native (Expo) frontend
+   - Clean, intuitive UI for browsing feed content
+   - Authentication flows for personalization
+   - Company preference management interface
+   - Article viewing and interaction features
 
-- [**React Native**](https://reactnative.dev/docs/getting-started)
-- [**Ionic**](https://ionicframework.com/docs/)
-- [**Swift**](https://developer.apple.com/documentation/swift/)
-- [**Android**](https://developer.android.com/get-started/overview)
+## API Documentation
 
-Proper documentation is key. Ensure that your submission includes detailed documentation covering your code structure, API integrations, and overall design to facilitate clarity and maintainability.
+Our backend provides a comprehensive set of RESTful APIs:
 
-## How to Submit
+### Main API Endpoints
 
-- **Fork the Repository:**  
-  Fork this repository while keeping the existing `README.md` file intact for your team's documentation.
+- **User Management**:
+  - `POST /api/users/register` - Create new user account
+  - `POST /api/users/login` - Authenticate user
+  - `GET/PUT /api/users/:userId/preferences` - Get/update user company preferences
 
-- **Develop Your Project:**  
-  Build your mobile app, ensuring that it meets all challenge requirements and is thoroughly documented.
+- **Feed Consumption**:
+  - `GET /api/news` - Get all feeds (with sorting options)
+  - `GET /api/news/personalized?userId=<id>` - Get personalized feeds based on user company preferences
+  - `GET /api/news/categories` - Get available companies with feeds
 
-- **Submit Your Code:**  
-  Once your project is complete, submit your final code by providing a link to your forked repository.
+- **Feed Management**:
+  - `GET /api/feeds` - List all feed sources
+  - `POST /api/feeds` - Add new company feed source 
+  - `PUT/DELETE /api/feeds/:id` - Update/remove feed source
 
-- **Presentation/Demo:**  
-  At the end of the Hackathon, be prepared to present or demo your app, highlighting its functionality and key features.
+For detailed API documentation with request/response examples, see the [Backend README](./backend/README.md).
 
+## Installation and Setup
+
+### Backend Server
+
+Navigate to the `backend` directory and follow these steps:
+
+1. Install dependencies: `npm install`
+2. Create a `.env` file with configuration:
+   ```
+   PORT=5000
+   MONGODB_URI=mongodb://localhost:27017/NewsFeed
+   ```
+3. Run the development server: `npm run dev`
+4. Seed initial feed sources: `node scripts/seedFeeds.js`
+
+### Mobile App
+
+Navigate to the `app` directory and follow these steps:
+
+1. Install dependencies: `npm install`
+2. Update the API endpoint in `app/config.js` to point to your backend server
+3. Start the Expo development server: `npm start`
+4. Scan the QR code with Expo Go app or run in a simulator
+
+## Challenge Objectives Met
+
+- **RSS Feed Integration**: We implemented a system that aggregates multiple RSS feeds and presents them in a unified interface
+- **Role-Based Access**: Users can customize their feed experience through company preferences, effectively creating personalized content access
+- **Notification Functionality**: Planned for future implementation - would use Firebase Cloud Messaging for push notifications on new content
+
+---
 
 ## Examples:
 

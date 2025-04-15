@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate } = require('../middleware/auth');
-const { 
-  getNews, 
-  getPersonalizedNews, 
-  getNewsCategories, 
+const {
+  getNews,
+  getPersonalizedNews,
+  getNewsCategories,
   getNewsById
 } = require('../controllers/newsController');
 
