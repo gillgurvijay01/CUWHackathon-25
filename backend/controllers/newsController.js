@@ -22,53 +22,77 @@ const fetchFeedData = async (url) => {
  */
 const getNews = async (req, res) => {
   try {
-    // Get sorting parameters from query
-    const { sort = 'desc', limit = 50 } = req.query;
+    // Get sorting and pagination parameters from query
+    const { sort = 'desc', limit = 100, page = 1 } = req.query;
+    const pageNum = parseInt(page) || 1;
+    const pageSize = parseInt(limit) || 10;
     const sortOrder = sort.toLowerCase() === 'asc' ? 1 : -1;
-    
+
     // Get all active feed sources
     const feedSources = await RssFeed.find({ active: true });
-    
+
     if (!feedSources.length) {
       return res.status(404).json({ message: 'No feed sources found' });
     }
-    
+
     // Fetch data from all feed sources in parallel
     const feedPromises = feedSources.map(feed => fetchFeedData(feed.url));
     const feedResults = await Promise.all(feedPromises);
-    
+
     // Combine and process all feed items
     let allItems = [];
     feedResults.forEach((items, index) => {
       if (items && items.length) {
         // Add source information to each item
         const sourceName = feedSources[index].name;
-        
+
         const processedItems = items.map(item => ({
           ...item,
           source: sourceName,
           date_published: item.date_published || new Date().toISOString()
         }));
-        
+
         allItems = [...allItems, ...processedItems];
       }
     });
-    
-    // Sort items by publication date
+
+    // Filter items to include only those not more than 10 days old
+    const tenDaysAgo = new Date();
+    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+
+    allItems = allItems.filter(item => {
+      const itemDate = new Date(item.date_published);
+      return itemDate >= tenDaysAgo;
+    });
+
+    // Sort by date first (most recent first by default)
     allItems.sort((a, b) => {
       const dateA = new Date(a.date_published);
       const dateB = new Date(b.date_published);
       return sortOrder * (dateB - dateA);
     });
-    
-    // Limit the number of items if requested
-    if (limit) {
-      allItems = allItems.slice(0, parseInt(limit));
+
+    // Shuffle the items to break up author chunks
+    for (let i = allItems.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
     }
-    
+
+    // Calculate pagination values
+    const totalItems = allItems.length;
+    const totalPages = Math.ceil(totalItems / pageSize);
+    const startIndex = (pageNum - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    // Get items for the requested page
+    const paginatedItems = allItems.slice(startIndex, endIndex);
+
     res.json({
-      count: allItems.length,
-      items: allItems
+      count: totalItems,
+      currentPage: pageNum,
+      totalPages: totalPages,
+      pageSize: pageSize,
+      items: paginatedItems
     });
   } catch (error) {
     console.error('Error in getNews controller:', error);
@@ -85,22 +109,22 @@ const getPersonalizedNews = async (req, res) => {
   try {
     const { sort = 'desc', limit = 50 } = req.query;
     const sortOrder = sort.toLowerCase() === 'asc' ? 1 : -1;
-    
+
     // Get user preferences from authenticated user
     const userPreferences = req.user.preferences;
-    
+
     let feedSources;
-    
+
     // If user has preferences, filter feed sources by company name
     if (userPreferences && userPreferences.length > 0) {
       feedSources = await RssFeed.find({
         active: true,
         name: { $in: userPreferences }
       });
-      
+
       // If no feeds match preferences, return message
       if (!feedSources.length) {
-        return res.status(404).json({ 
+        return res.status(404).json({
           message: 'No feed sources match your company preferences',
           preferences: userPreferences
         });
@@ -108,45 +132,45 @@ const getPersonalizedNews = async (req, res) => {
     } else {
       // If no preferences, get all active feed sources
       feedSources = await RssFeed.find({ active: true });
-      
+
       if (!feedSources.length) {
         return res.status(404).json({ message: 'No feed sources found' });
       }
     }
-    
+
     // Fetch data from all relevant feed sources in parallel
     const feedPromises = feedSources.map(feed => fetchFeedData(feed.url));
     const feedResults = await Promise.all(feedPromises);
-    
+
     // Combine and process all feed items
     let allItems = [];
     feedResults.forEach((items, index) => {
       if (items && items.length) {
         // Add source information to each item
         const sourceName = feedSources[index].name;
-        
+
         const processedItems = items.map(item => ({
           ...item,
           source: sourceName,
           date_published: item.date_published || new Date().toISOString()
         }));
-        
+
         allItems = [...allItems, ...processedItems];
       }
     });
-    
+
     // Sort items by publication date
     allItems.sort((a, b) => {
       const dateA = new Date(a.date_published);
       const dateB = new Date(b.date_published);
       return sortOrder * (dateB - dateA);
     });
-    
+
     // Limit the number of items
     if (limit) {
       allItems = allItems.slice(0, parseInt(limit));
     }
-    
+
     res.json({
       count: allItems.length,
       personalized: userPreferences && userPreferences.length > 0,
@@ -166,7 +190,7 @@ const getNewsCategories = async (req, res) => {
   try {
     // Get names of all companies with active feeds
     const companies = await RssFeed.distinct('name', { active: true });
-    
+
     res.json({
       count: companies.length,
       companies
@@ -184,11 +208,11 @@ const getNewsCategories = async (req, res) => {
 const getNewsById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // This is a placeholder implementation
     // In a real app, you might store articles in a database or implement a more complex lookup
-    
-    res.status(501).json({ 
+
+    res.status(501).json({
       message: 'Feature not implemented',
       note: 'This feature requires storing articles in a database for retrieval by ID'
     });
