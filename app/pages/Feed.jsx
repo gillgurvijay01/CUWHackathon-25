@@ -7,11 +7,16 @@ import {
   Button,
   Image,
   ActivityIndicator,
+  TouchableOpacity,
+  Platform,
 } from "react-native";
 import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import uuid from "react-native-uuid";
 import { nodeUrl } from "../config/GlobalConfig";
+
+// Import for NewsArticleDetail component
+import { NewsArticleDetail } from "../Components/NewsArticle";
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -19,6 +24,7 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
 const Feed = () => {
   const [expoPushToken, setExpoPushToken] = useState("");
   const notificationListener = useRef();
@@ -28,6 +34,7 @@ const Feed = () => {
   const [hasMore, setHasMore] = useState(true); // If more data to fetch
   const [loading, setLoading] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false); // For bottom loader
+  const [selectedArticle, setSelectedArticle] = useState(null);
 
   const fetchData = async (pageNumber = 1) => {
     try {
@@ -80,134 +87,150 @@ const Feed = () => {
     };
   }, []);
 
+  const handleArticlePress = (article) => {
+    setSelectedArticle(article);
+  };
+
+  const handleGoBack = () => {
+    setSelectedArticle(null);
+  };
+
   const renderItem = ({ item }) => (
-    <View style={styles.itemContainer}>
-      <Text style={styles.itemTitle}>{item.title}</Text>
-      <Text style={styles.itemDate}>
-        Published: {new Date(item.date_published).toLocaleDateString()}
-      </Text>
-      <Text style={styles.itemAuthor}>
-        Author: {item.authors[0]?.name || "N/A"}
-      </Text>
-      {item.image && (
-        <Image
-          source={{ uri: item.image }}
-          style={styles.itemImage}
-          resizeMode="cover"
-        />
-      )}
-      <Text style={styles.itemCategories}>
-        Categories: {item.categories?.join(", ") || "None"}
-      </Text>
-    </View>
+    <TouchableOpacity onPress={() => handleArticlePress(item)}>
+      <View style={styles.itemContainer}>
+        <Text style={styles.itemTitle}>{item.title}</Text>
+        <Text style={styles.itemDate}>
+          Published: {new Date(item.date_published).toLocaleDateString()}
+        </Text>
+        <Text style={styles.itemAuthor}>
+          Author: {item.authors[0]?.name || "N/A"}
+        </Text>
+        {item.image && (
+          <Image
+            source={{ uri: item.image }}
+            style={styles.itemImage}
+            resizeMode="cover"
+          />
+        )}
+        <Text style={styles.itemCategories}>
+          Categories: {item.categories?.join(", ") || "None"}
+        </Text>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
-    <>
-      <View style={styles.container}>
-        <Text style={styles.header}>This is feed screen</Text>
+    <View style={styles.container}>
+      {selectedArticle ? (
+        <NewsArticleDetail article={selectedArticle} onGoBack={handleGoBack} />
+      ) : (
+        <>
+          <Text style={styles.header}>Top Feed in last 10 days</Text>
 
-        <View style={{ marginBottom: 10, alignItems: "center" }}>
-          <Button
-            title="Reload Feed"
-            onPress={() => {
-              setPage(1);
-              fetchData(1);
-            }}
-            color="#1a73e8"
-          />
-        </View>
-
-        <View style={styles.contentContainer}></View>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#1a73e8" />
+          <View style={{ marginBottom: 10, alignItems: "center" }}>
+            <Button
+              title="Reload Feed"
+              onPress={() => {
+                setPage(1);
+                fetchData(1);
+              }}
+              color="#1a73e8"
+            />
           </View>
-        ) : (
-          <FlatList
-            data={data}
-            renderItem={renderItem}
-            keyExtractor={() => uuid.v4()}
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              isFetchingMore ? (
-                <Text style={{ textAlign: "center" }}>Loading more...</Text>
-              ) : null
-            }
-          />
-        )}
-      </View>
 
-      <View style={styles.footer}>
-        <Text>Your Expo Push Token:</Text>
-        <Text selectable>{expoPushToken}</Text>
-        <Button title="Send Test Notification" onPress={sendTestNotification} />
-        <Button
-          title="Send Random Article Notification"
-          onPress={sendRandomArticleNotification}
-        />
-      </View>
-    </>
+          <View style={styles.contentContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#1a73e8" />
+              </View>
+            ) : (
+              <FlatList
+                data={data}
+                renderItem={renderItem}
+                keyExtractor={() => uuid.v4()}
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                  isFetchingMore ? (
+                    <Text style={{ textAlign: "center" }}>Loading more...</Text>
+                  ) : null
+                }
+              />
+            )}
+          </View>
+
+          <View style={styles.footer}>
+            <Text>Your Expo Push Token:</Text>
+            <Text selectable>{expoPushToken}</Text>
+            <Button
+              title="Send Test Notification"
+              onPress={sendTestNotification}
+            />
+            <Button
+              title="Send Random Article Notification"
+              onPress={sendRandomArticleNotification}
+            />
+          </View>
+        </>
+      )}
+    </View>
   );
 };
+export default Feed;
+// Rest of your code (styles and functions) remains unchanged
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "#f0f2f5",
+    backgroundColor: "#f5f7fa",
+    paddingTop: Platform.OS === "ios" ? 50 : 20,
+    paddingHorizontal: 12,
   },
   header: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginVertical: 20,
+    fontSize: 24,
+    fontWeight: "700",
     textAlign: "center",
-    color: "#1a73e8",
+    marginVertical: -10,
+    color: "#2c3e50",
     letterSpacing: 0.5,
   },
   contentContainer: {
-    marginBottom: 16,
+    flex: 1,
+    paddingHorizontal: 4,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 20,
-  },
-  footer: {
-    padding: 16,
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#eaeaea",
   },
   itemContainer: {
-    padding: 18,
-    marginBottom: 16,
+    backgroundColor: "#ffffff",
     borderRadius: 12,
-    backgroundColor: "#fff",
+    padding: 16,
+    marginBottom: 16,
+    elevation: 4,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    borderLeftWidth: 4,
+    borderLeftColor: "#1a73e8",
   },
   itemTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    color: "#2c3e50",
     marginBottom: 10,
-    lineHeight: 26,
+    color: "#2c3e50",
+    lineHeight: 24,
   },
   itemDate: {
     fontSize: 14,
-    color: "#666",
-    marginBottom: 6,
+    color: "#7f8c8d",
+    marginBottom: 4,
     fontWeight: "500",
   },
   itemAuthor: {
     fontSize: 14,
-    color: "#5a6b7b",
+    color: "#7f8c8d",
     marginBottom: 12,
     fontWeight: "500",
   },
@@ -216,50 +239,37 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 10,
     marginBottom: 12,
-    backgroundColor: "#e1e4e8",
   },
   itemCategories: {
     fontSize: 13,
-    color: "#777",
+    color: "#7f8c8d",
     fontStyle: "italic",
     marginTop: 6,
-    paddingTop: 8,
+  },
+  footer: {
+    padding: 18,
+    backgroundColor: "#e8eef7",
+    alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    borderTopColor: "#d4e0f7",
+    borderRadius: 8,
+    marginTop: 10,
+    marginBottom: 15,
   },
 });
-const sendTestNotification = async () => {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "Test Notification 📬",
-      body: "Hello from your Expo app!",
-      data: { testData: "123" },
-    },
-    trigger: { seconds: 2 },
-  });
-};
-const sendRandomArticleNotification = async () => {
-  if (data && data.length > 0) {
-    const randomIndex = Math.floor(Math.random() * data.length);
-    const randomArticle = data[randomIndex];
-
-    console.log("Random article picked for notification:", randomArticle);
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: randomArticle.title || "New Article",
-        body: randomArticle.summary || "Check out this article!",
-        data: { url: randomArticle.link || "" },
-      },
-      trigger: { seconds: 2 },
-    });
-  } else {
-    alert("No articles available to send as a notification.");
-  }
-};
 
 async function registerForPushNotificationsAsync() {
   let token;
+
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+  }
+
   if (Device.isDevice) {
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
@@ -269,24 +279,36 @@ async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
     if (finalStatus !== "granted") {
-      alert("Failed to get push token!");
+      alert("Failed to get push token for push notification!");
       return;
     }
     token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log("Expo Push Token:", token);
   } else {
-    alert("Push notifications require a physical device");
-  }
-
-  if (Platform.OS === "android") {
-    Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#FF231F7C",
-    });
+    alert("Must use physical device for Push Notifications");
   }
 
   return token;
 }
-export default Feed;
+
+async function sendTestNotification() {
+  await fetch(`${nodeUrl}/send-notification`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      message: "This is a test notification",
+    }),
+  });
+}
+
+async function sendRandomArticleNotification() {
+  await fetch(`${nodeUrl}/send-random-article-notification`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+  });
+}
