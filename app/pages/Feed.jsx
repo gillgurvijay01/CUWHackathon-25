@@ -118,6 +118,64 @@ const Feed = () => {
       </View>
     </TouchableOpacity>
   );
+  const sendTestNotification = async () => {
+    // Array of sample breaking news notifications
+    const breakingNews = [
+      {
+        title: "Breaking News!",
+        body: "Major development in global politics. Tap to read more.",
+      },
+      {
+        title: "Weather Alert",
+        body: "Unexpected weather changes forecasted for tomorrow.",
+      },
+      {
+        title: "Technology Update",
+        body: "Revolutionary new tech product just announced.",
+      },
+      {
+        title: "Sports Flash",
+        body: "Championship results in! Surprising outcome in finals.",
+      },
+      {
+        title: "Market Update",
+        body: "Significant shifts in the stock market today.",
+      },
+    ];
+
+    // Select a random news item
+    const randomNews =
+      breakingNews[Math.floor(Math.random() * breakingNews.length)];
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: randomNews.title,
+        body: randomNews.body,
+        data: { type: "breaking_news" },
+      },
+      trigger: null, // Send immediately
+    });
+  };
+  const sendRandomArticleNotification = async () => {
+    // Using the data from current state
+    if (!data || data.length === 0) {
+      alert("No articles available to send notification");
+      return;
+    }
+
+    const randomArticle = data[Math.floor(Math.random() * data.length)];
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: randomArticle.title || "Article Recommendation",
+        body: randomArticle.authors?.[0]?.name
+          ? `By ${randomArticle.authors[0].name}`
+          : "Check out this trending article",
+        data: { articleId: randomArticle.id },
+      },
+      trigger: null, // Send immediately
+    });
+  };
 
   return (
     <View style={styles.container}>
@@ -288,27 +346,4 @@ async function registerForPushNotificationsAsync() {
   }
 
   return token;
-}
-
-async function sendTestNotification() {
-  await fetch(`${nodeUrl}/send-notification`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: "This is a test notification",
-    }),
-  });
-}
-
-async function sendRandomArticleNotification() {
-  await fetch(`${nodeUrl}/send-random-article-notification`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-  });
 }
