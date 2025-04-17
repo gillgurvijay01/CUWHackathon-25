@@ -6,6 +6,7 @@ import Login from './pages/Login';
 import Home from './pages/Home';
 import Feed from "./pages/Feed";
 import Signup from './pages/Signup';
+import Settings from './pages/Settings';
 const Stack = createNativeStackNavigator();
 
 function AppNavigator() {
@@ -16,6 +17,7 @@ function AppNavigator() {
         <Stack.Screen name="Home" component={Home} />
         <Stack.Screen name="Feed" component={Feed} />
         <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="Settings" component={Settings} />
       </Stack.Navigator>
     </NavigationContainer>
   );

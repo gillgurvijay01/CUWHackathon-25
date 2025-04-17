@@ -14,9 +14,16 @@ import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import uuid from "react-native-uuid";
 import { nodeUrl } from "../config/GlobalConfig";
+import { SafeAreaView } from "react-native";
+import { StatusBar } from "expo-status-bar";
 
 // Import for NewsArticleDetail component
 import { NewsArticleDetail } from "../Components/NewsArticle";
+import { removeToken as logout } from "../auth/auth";
+import {
+  createStaticNavigation,
+  useNavigation,
+} from "@react-navigation/native";
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -28,6 +35,8 @@ Notifications.setNotificationHandler({
 const Feed = () => {
   const [expoPushToken, setExpoPushToken] = useState("");
   const notificationListener = useRef();
+  const navigation = useNavigation();
+
   const responseListener = useRef();
   const [data, setData] = useState([]); // Flat list data
   const [page, setPage] = useState(1); // Pagination
@@ -96,27 +105,30 @@ const Feed = () => {
   };
 
   const renderItem = ({ item }) => (
-    <TouchableOpacity onPress={() => handleArticlePress(item)}>
-      <View style={styles.itemContainer}>
-        <Text style={styles.itemTitle}>{item.title}</Text>
-        <Text style={styles.itemDate}>
-          Published: {new Date(item.date_published).toLocaleDateString()}
-        </Text>
-        <Text style={styles.itemAuthor}>
-          Author: {item.authors[0]?.name || "N/A"}
-        </Text>
-        {item.image && (
-          <Image
-            source={{ uri: item.image }}
-            style={styles.itemImage}
-            resizeMode="cover"
-          />
-        )}
-        <Text style={styles.itemCategories}>
-          Categories: {item.categories?.join(", ") || "None"}
-        </Text>
-      </View>
-    </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="auto" />
+      <TouchableOpacity onPress={() => handleArticlePress(item)}>
+        <View style={styles.itemContainer}>
+          <Text style={styles.itemTitle}>{item.title}</Text>
+          <Text style={styles.itemDate}>
+            Published: {new Date(item.date_published).toLocaleDateString()}
+          </Text>
+          <Text style={styles.itemAuthor}>
+            Author: {item.authors[0]?.name || "N/A"}
+          </Text>
+          {item.image && (
+            <Image
+              source={{ uri: item.image }}
+              style={styles.itemImage}
+              resizeMode="cover"
+            />
+          )}
+          <Text style={styles.itemCategories}>
+            Categories: {item.categories?.join(", ") || "None"}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </SafeAreaView>
   );
   const sendTestNotification = async () => {
     // Array of sample breaking news notifications
@@ -183,9 +195,37 @@ const Feed = () => {
         <NewsArticleDetail article={selectedArticle} onGoBack={handleGoBack} />
       ) : (
         <>
-          <Text style={styles.header}>Top Feed in last 10 days</Text>
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={async () => {
+                try {
+                  await logout();
+                  // Show logout alert
+                  alert("You have been logged out");
+                  // Navigate to login screen
+                  navigation.replace("Login");
+                } catch (error) {
+                  console.error("Logout failed:", error);
+                }
+              }}
+            >
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
 
-          <View style={{ marginBottom: 10, alignItems: "center" }}>
+            <Text style={styles.header}>Top Feed in last 10 days</Text>
+
+            <TouchableOpacity
+              style={styles.settingsButton}
+              onPress={() => {
+                navigation.navigate("Settings");
+              }}
+            >
+              <Text style={styles.settingsIcon}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.reloadContainer}>
             <Button
               title="Reload Feed"
               onPress={() => {
@@ -217,13 +257,17 @@ const Feed = () => {
             )}
           </View>
 
-          <View style={styles.footer}>
-            <Text>Your Expo Push Token:</Text>
-            <Text selectable>{expoPushToken}</Text>
+          <View style={styles.footer}></View>
+          <Text style={styles.footerText}>Your Expo Push Token:</Text>
+          <Text selectable style={styles.tokenText}>
+            {expoPushToken}
+          </Text>
+          <View style={styles.footerButtons}>
             <Button
               title="Send Test Notification"
               onPress={sendTestNotification}
             />
+            <View style={{ width: 10 }} />
             <Button
               title="Send Random Article Notification"
               onPress={sendRandomArticleNotification}
@@ -237,10 +281,50 @@ const Feed = () => {
 export default Feed;
 // Rest of your code (styles and functions) remains unchanged
 const styles = StyleSheet.create({
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 5,
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  logoutButton: {
+    padding: 8,
+  },
+  logoutText: {
+    color: "#e74c3c",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  settingsButton: {
+    padding: 8,
+  },
+  settingsIcon: {
+    fontSize: 22,
+  },
+  header: {
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    color: "#2c3e50",
+    letterSpacing: 0.5,
+  },
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#f5f7fa",
+  },
   container: {
     flex: 1,
     backgroundColor: "#f5f7fa",
-    paddingTop: Platform.OS === "ios" ? 50 : 20,
+    paddingTop: Platform.OS === "ios" ? 50 : 20, // This is creating the gap
     paddingHorizontal: 12,
   },
   header: {
