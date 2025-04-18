@@ -25,7 +25,7 @@ const Signup = () => {
 
   const organizations = [
     "Aurora WDC",
-    "Concordia University-Wisconsin (CUW)",
+    "CUW News",
     "Meta",
     "Google",
     "Microsoft",

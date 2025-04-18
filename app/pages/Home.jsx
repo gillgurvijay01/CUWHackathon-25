@@ -11,7 +11,7 @@ const Home = () => {
   return (
     <View style={styles.container}>
       <Text>Home</Text>
-      <Text>Welcome to the Home Screen!</Text>
+      <Text>Welcome to FeedFusion by Aurora WDC!</Text>
       <Text onPress={() => navigation.navigate("Login")}>
         Click Here to Go to login.
       </Text>

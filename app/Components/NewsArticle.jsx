@@ -8,20 +8,95 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Share,
+  Linking,
+  Alert,
 } from "react-native";
 import moment from "moment";
 import Icon from "react-native-vector-icons/Ionicons"; // Make sure this is installed
 
 export const NewsArticleDetail = ({ article, onGoBack }) => {
+  // Function to get the author name
+  const getAuthorName = () => {
+    if (article?.authors && Array.isArray(article.authors) && article.authors.length > 0) {
+      const author = article.authors[0];
+      if (author && typeof author === 'object' && author.name) {
+        return author.name;
+      }
+      if (typeof author === 'string') {
+        return author;
+      }
+    }
+    return article?.source || "Unknown Author";
+  };
+  
+  // Get author initial for avatar
+  const getAuthorInitial = () => {
+    const authorName = getAuthorName();
+    return authorName && authorName.length > 0 ? authorName[0].toUpperCase() : "?";
+  };
+  
+  // Format date
+  const formatDate = (dateString) => {
+    if (!dateString) return "Unknown date";
+    try {
+      return moment(dateString).format("MMM DD, YYYY • HH:mm");
+    } catch (e) {
+      return "Unknown date";
+    }
+  };
+  
+  // Open the article URL in browser
+  const openArticleUrl = () => {
+    const url = article?.url || article?.link;
+    if (url) {
+      Linking.canOpenURL(url)
+        .then(supported => {
+          if (supported) {
+            Linking.openURL(url);
+          } else {
+            Alert.alert("Error", "Cannot open this URL");
+          }
+        })
+        .catch(err => {
+          console.error("Error opening URL:", err);
+          Alert.alert("Error", "Cannot open this URL");
+        });
+    } else {
+      Alert.alert("Error", "No URL available for this article");
+    }
+  };
+
+  // Share the article
   const handleShare = async () => {
     try {
       await Share.share({
         message: `Check out this article: ${article?.title}`,
-        url: article?.url,
+        url: article?.url || article?.link,
       });
     } catch (error) {
       console.log(error);
     }
+  };
+
+  // Get the content to display
+  const getContent = () => {
+    // First try content_text (plaintext content)
+    if (article?.content_text && article.content_text.trim().length > 0) {
+      return article.content_text;
+    }
+    
+    // Then try content (might contain HTML)
+    if (article?.content && article.content.trim().length > 0) {
+      // Simple HTML tag removal
+      return article.content.replace(/<[^>]*>?/gm, '');
+    }
+    
+    // Finally try description as fallback
+    if (article?.description && article.description.trim().length > 0) {
+      return article.description.replace(/<[^>]*>?/gm, '');
+    }
+    
+    return "No content available for this article.";
   };
 
   return (
@@ -39,36 +114,40 @@ export const NewsArticleDetail = ({ article, onGoBack }) => {
       <ScrollView style={styles.container}>
         {/* Article Content */}
         <View style={styles.contentContainer}>
-          <Text style={styles.category}>{article?.source?.name}</Text>
+          <Text style={styles.category}>{article?.source || "News"}</Text>
           <Text style={styles.title}>{article?.title}</Text>
 
           <View style={styles.authorContainer}>
             <View style={styles.authorImageContainer}>
-              <Text style={styles.authorInitial}>
-                {article?.authors[0]?.name[0] || "A"}
-              </Text>
+              <Text style={styles.authorInitial}>{getAuthorInitial()}</Text>
             </View>
             <View>
-              <Text style={styles.author}>
-                {article?.authors[0]?.name || "Unknown Author"}
-              </Text>
+              <Text style={styles.author}>{getAuthorName()}</Text>
               <Text style={styles.timestamp}>
-                {moment(article?.publishedAt).format("MMM DD, YYYY • HH:mm")}
+                {formatDate(article?.date_published)}
               </Text>
             </View>
           </View>
 
-          <Image
-            source={{
-              uri: article?.image ?? "https://picsum.photos/800",
-              cache: "force-cache",
-            }}
-            style={styles.image}
-            resizeMode="cover"
-          />
+          {article?.image && (
+            <Image
+              source={{
+                uri: article.image,
+                cache: "force-cache",
+              }}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          )}
 
-          <Text style={styles.description}>{article?.content_text}</Text>
-          <Text style={styles.content}>{article?.content}</Text>
+          <Text style={styles.content}>{getContent()}</Text>
+          
+          {/* Read more button */}
+          {(article?.url || article?.link) && (
+            <TouchableOpacity style={styles.readMoreButton} onPress={openArticleUrl}>
+              <Text style={styles.readMoreText}>Read Full Article</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -146,16 +225,24 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
   },
-  description: {
-    fontSize: 17,
-    fontWeight: "500",
-    color: "#333",
-    lineHeight: 26,
-    marginBottom: 16,
-  },
   content: {
     fontSize: 16,
     color: "#444",
     lineHeight: 24,
+    marginBottom: 20,
+  },
+  readMoreButton: {
+    backgroundColor: "#3b82f6",
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  readMoreText: {
+    color: "white",
+    fontWeight: "600",
+    fontSize: 16,
   },
 });

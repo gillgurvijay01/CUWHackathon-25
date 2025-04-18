@@ -1,9 +1,6 @@
 const RssFeed = require('../models/RssFeed');
 const axios = require('axios');
 
-/**
- * Get all feed sources
- */
 const getAllFeeds = async (req, res) => {
   try {
     const feeds = await RssFeed.find().sort({ category: 1, name: 1 });
@@ -17,24 +14,20 @@ const getAllFeeds = async (req, res) => {
   }
 };
 
-/**
- * Add a new feed source
- */
+
 const addFeed = async (req, res) => {
   try {
-    const { name, url, category, description } = req.body;
+    const { name, url, description } = req.body;
     
-    if (!name || !url || !category) {
+    if (!name || !url) {
       return res.status(400).json({ message: 'Name, URL, and category are required' });
     }
     
-    // Check if feed already exists
     const existingFeed = await RssFeed.findOne({ $or: [{ name }, { url }] });
     if (existingFeed) {
       return res.status(400).json({ message: 'Feed with this name or URL already exists' });
     }
-    
-    // Validate the RSS URL by attempting to fetch data
+  
     try {
       const response = await axios.get(url);
       if (!response.data || !response.data.items) {
@@ -68,9 +61,7 @@ const addFeed = async (req, res) => {
   }
 };
 
-/**
- * Update an existing feed
- */
+
 const updateFeed = async (req, res) => {
   try {
     const { feedId } = req.params;
@@ -117,9 +108,7 @@ const updateFeed = async (req, res) => {
   }
 };
 
-/**
- * Delete a feed
- */
+
 const deleteFeed = async (req, res) => {
   try {
     const { feedId } = req.params;
@@ -139,9 +128,7 @@ const deleteFeed = async (req, res) => {
   }
 };
 
-/**
- * Test a feed URL to validate if it returns proper RSS data
- */
+
 const testFeedUrl = async (req, res) => {
   try {
     const { url } = req.body;

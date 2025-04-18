@@ -3,6 +3,7 @@ import { getToken } from "../auth/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -37,8 +38,18 @@ const Settings = () => {
         Alert.alert("Error", "You need to be logged in to view settings");
         return;
       }
-      setUser(JSON.parse(token));
-      setOriginalPreferences(JSON.parse(token).preferences || []);
+      
+      const userData = JSON.parse(token);
+      setUser(userData);
+      
+      // Ensure preferences are properly formatted and filter out null values
+      const preferences = userData.preferences || [];
+      const validPreferences = Array.isArray(preferences) 
+        ? preferences.filter(pref => pref !== null && pref !== undefined) 
+        : [];
+      
+      setOriginalPreferences(validPreferences);
+      setSelectedPreferences(validPreferences); // Also set selected preferences
       setLoading(false);
     } catch (error) {
       console.error("Failed to fetch user data:", error);
@@ -49,14 +60,44 @@ const Settings = () => {
 
   const fetchAvailablePreferences = async () => {
     try {
-      console.log("Hi");
-      const response = await axios.get(`${nodeUrl}/feeds`).then((res) => {
-        console.log("Response:", res.data);
-        return res;
-      });
-      setAvailablePreferences(response.data.feeds);
+      console.log("Fetching available preferences");
+      // Use the news/categories endpoint which returns company names
+      const response = await axios.get(`${nodeUrl}/news/categories`);
+      
+      if (response && response.data) {
+        console.log("Response from news/categories:", response.data);
+        
+        // Handle response structure from news/categories
+        let companies = [];
+        
+        if (response.data.companies && Array.isArray(response.data.companies)) {
+          companies = response.data.companies;
+          console.log("Found companies:", companies);
+        } else {
+          console.warn("Unexpected API response format:", response.data);
+          companies = [];
+        }
+        
+        // Convert company names to preference objects
+        const safePreferences = companies.map((companyName, index) => {
+          if (!companyName) return null;
+          
+          return {
+            id: companyName,  
+            name: companyName 
+          };
+        }).filter(pref => pref !== null);
+        
+        console.log("Available preferences:", safePreferences);
+        setAvailablePreferences(safePreferences);
+      } else {
+        console.error("Invalid API response:", response);
+        setAvailablePreferences([]);
+        Alert.alert("Error", "Invalid response from server");
+      }
     } catch (error) {
       console.error("Failed to fetch preferences:", error);
+      setAvailablePreferences([]);
       Alert.alert("Error", "Failed to load preferences options");
     }
   };
@@ -69,10 +110,19 @@ const Settings = () => {
   };
 
   const togglePreference = (preference) => {
-    // Check if already selected
-    if (selectedPreferences.some((p) => p.id === preference.id)) {
+    if (!preference || !preference.id) {
+      console.error("Invalid preference object", preference);
+      return;
+    }
+    
+
+    const isSelected = selectedPreferences.some(
+      (p) => p && p.id && p.id === preference.id
+    );
+    
+    if (isSelected) {
       setSelectedPreferences(
-        selectedPreferences.filter((p) => p.id !== preference.id)
+        selectedPreferences.filter((p) => p && p.id !== preference.id)
       );
     } else {
       // Ensure max 3 preferences
@@ -105,10 +155,37 @@ const Settings = () => {
             try {
               setLoading(true);
               const token = await getToken();
+              
+              if (!user || !user.id) {
+                throw new Error("User ID not found");
+              }
 
+              const validPreferences = selectedPreferences
+                .filter(p => p && p.id)
+                .map(p => p.id);
+              
+              console.log("Saving preferences:", validPreferences);
+
+              // Update preferences on the server
               await axios.put(`${nodeUrl}/users/${user.id}/preferences`, {
-                preferences: selectedPreferences.map((p) => p.id),
+                preferences: validPreferences,
               });
+              
+              console.log("Preferences updated on server successfully");
+
+              // Update the local user data in AsyncStorage
+              try {
+                const userData = JSON.parse(token);
+                userData.preferences = validPreferences; // Save just the IDs (company names) for better compatibility
+                await AsyncStorage.setItem('@user_token', JSON.stringify(userData));
+                console.log("Preferences saved to local storage:", userData.preferences);
+                
+                // Update local state
+                setUser(userData);
+              } catch (storageError) {
+                console.error("Failed to update local preferences:", storageError);
+                // Continue anyway since server update was successful
+              }
 
               setEditingPreferences(false);
               setOriginalPreferences(selectedPreferences);
@@ -173,9 +250,13 @@ const Settings = () => {
             <>
               <View style={styles.preferencesList}>
                 {originalPreferences.length > 0 ? (
-                  originalPreferences.map((pref) => (
-                    <View key={pref.id} style={styles.preferenceItem}>
-                      <Text style={styles.preferenceText}>{pref}</Text>
+                  originalPreferences.map((pref, index) => (
+                    <View key={pref?.id || index} style={styles.preferenceItem}>
+                      <Text style={styles.preferenceText}>
+                        {typeof pref === 'string' 
+                          ? pref 
+                          : (pref?.name || pref?.id || 'Unknown preference')}
+                      </Text>
                     </View>
                   ))
                 ) : (
@@ -196,12 +277,12 @@ const Settings = () => {
                 Select 1-3 preferences that interest you
               </Text>
               <View style={styles.preferencesGrid}>
-                {availablePreferences.map((preference) => (
+                {availablePreferences.map((preference, index) => (
                   <TouchableOpacity
-                    key={preference.id}
+                    key={preference?.id || index}
                     style={[
                       styles.preferenceOption,
-                      selectedPreferences.some((p) => p.id === preference.id) &&
+                      selectedPreferences.some((p) => p && p.id && p.id === preference?.id) &&
                         styles.selectedPreferenceOption,
                     ]}
                     onPress={() => togglePreference(preference)}
@@ -210,11 +291,11 @@ const Settings = () => {
                       style={[
                         styles.preferenceOptionText,
                         selectedPreferences.some(
-                          (p) => p.id === preference.id
+                          (p) => p && p.id && p.id === preference?.id
                         ) && styles.selectedPreferenceOptionText,
                       ]}
                     >
-                      {preference.name}
+                      {preference?.name || 'Unnamed'}
                     </Text>
                   </TouchableOpacity>
                 ))}

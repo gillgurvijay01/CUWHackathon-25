@@ -57,7 +57,7 @@ export default function Login() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>Feed Login</Text>
+      <Text style={styles.logo}>FeedFusion Login</Text>
       <TextInput
         style={styles.input}
         placeholder="Username"

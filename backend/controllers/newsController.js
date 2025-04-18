@@ -1,145 +1,303 @@
 const axios = require('axios');
 const RssFeed = require('../models/RssFeed');
+const Parser = require('rss-parser');
 
-/**
- * Fetch data from a single RSS feed URL
- * @param {String} url - The RSS feed URL
- * @returns {Array} - Array of feed items or empty array on error
- */
-const fetchFeedData = async (url) => {
+const fetchFeedData = async (url, sourceName) => {
   try {
-    const response = await axios.get(url);
-    return response.data.items || [];
+    console.log(`Fetching feed from ${sourceName}: ${url}`);
+    
+    // First, try a direct fetch to check the content type
+    const response = await axios.get(url, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      }
+    });
+    
+    // Check if the response is JSON (RSS.app uses JSON format)
+    if (typeof response.data === 'object') {
+      console.log(`Feed from ${sourceName} is in JSON format`);
+      
+      let items = [];
+      
+      // Handle different JSON structures
+      if (response.data.items && Array.isArray(response.data.items)) {
+        // Standard RSS.app format
+        items = response.data.items;
+        console.log(`Found ${items.length} items in standard JSON format`);
+      } else if (response.data.feed && response.data.feed.items && Array.isArray(response.data.feed.items)) {
+        // Nested format
+        items = response.data.feed.items;
+        console.log(`Found ${items.length} items in nested JSON format`);
+      } else if (Array.isArray(response.data)) {
+        // Direct array format
+        items = response.data;
+        console.log(`Found ${items.length} items in array JSON format`);
+      } else {
+        // Try to find an array property
+        for (const key in response.data) {
+          if (Array.isArray(response.data[key]) && response.data[key].length > 0) {
+            items = response.data[key];
+            console.log(`Found ${items.length} items in '${key}' JSON property`);
+            break;
+          }
+        }
+      }
+      
+      if (!items.length) {
+        console.warn(`No valid items found in JSON feed: ${sourceName}`);
+        return [];
+      }
+      
+      // Process and normalize JSON feed items
+      return items.map(item => {
+     
+        let imageUrl = null;
+        
+        
+        if (item.image || item.thumbnail || item.enclosure) {
+          imageUrl = item.image || 
+                    (item.thumbnail ? item.thumbnail.url || item.thumbnail : null) ||
+                    (item.enclosure && item.enclosure.url) || null;
+        } else if (item.media_content && item.media_content.length) {
+          imageUrl = item.media_content[0].url || null;
+        }
+        
+        // Create normalized item with consistent property names
+        return {
+          title: item.title || 'No Title',
+          link: item.url || item.link || '',
+          content: item.content_text || item.description || item.summary || '',
+          date_published: item.date_published || item.pubDate || item.published || item.date || new Date().toISOString(),
+          author: item.author || item.creator || sourceName,
+          image: imageUrl,
+          guid: item.id || item.guid || item.link || `${sourceName}-${Date.now()}-${Math.random()}`
+        };
+      });
+    } 
+    
+    else {
+      console.log(`Feed from ${sourceName} appears to be in XML format, using rss-parser`);
+      
+      // Use a timeout to prevent hanging on slow feeds
+      const parser = new Parser({
+        timeout: 10000, // 10 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        },
+        customFields: {
+          item: [
+            ['media:content', 'media'],
+            ['media:thumbnail', 'thumbnail'],
+            ['enclosure', 'enclosure']
+          ]
+        }
+      });
+      const xmlData = typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      const feed = await parser.parseString(xmlData);
+      
+      if (!feed || !feed.items || !Array.isArray(feed.items)) {
+        console.warn(`No valid items found in XML feed: ${sourceName}`);
+        return [];
+      }
+      
+      return feed.items.map(item => {
+        let imageUrl = null;
+
+        if (item.media && item.media.$ && item.media.$.url) {
+          imageUrl = item.media.$.url;
+        } 
+
+        else if (item.enclosure && item.enclosure.url && 
+                (item.enclosure.type || '').startsWith('image/')) {
+          imageUrl = item.enclosure.url;
+        }
+
+        else if (item.thumbnail && item.thumbnail.$ && item.thumbnail.$.url) {
+          imageUrl = item.thumbnail.$.url;
+        }
+
+        else if (item.content && typeof item.content === 'string') {
+          const imgMatch = /<img[^>]+src="([^">]+)"/i.exec(item.content);
+          if (imgMatch && imgMatch[1]) {
+            imageUrl = imgMatch[1];
+          }
+        }
+
+        else if (item['content:encoded'] && typeof item['content:encoded'] === 'string') {
+          const imgMatch = /<img[^>]+src="([^">]+)"/i.exec(item['content:encoded']);
+          if (imgMatch && imgMatch[1]) {
+            imageUrl = imgMatch[1];
+          }
+        }
+        return {
+          title: item.title || 'No Title',
+          link: item.link || '',
+          content: item.content || item.description || item.summary || '',
+          date_published: item.pubDate || item.published || item.date || new Date().toISOString(),
+          author: item.creator || item.author || item['dc:creator'] || sourceName,
+          image: imageUrl,
+          guid: item.guid || item.id || item.link || `${sourceName}-${Date.now()}-${Math.random()}`
+        };
+      });
+    }
   } catch (error) {
-    console.error(`Error fetching feed from ${url}:`, error.message);
+    console.error(`Error fetching feed from ${sourceName}:`, error.message);
     return [];
   }
 };
 
-/**
- * Get all news feeds without personalization
- * Fetches all active feeds and combines them
- */
 const getNews = async (req, res) => {
   try {
-    // Get sorting and pagination parameters from query
-    const { sort = 'desc', limit = 100, page = 1 } = req.query;
-    const pageNum = parseInt(page) || 1;
-    const pageSize = parseInt(limit) || 10;
-    const sortOrder = sort.toLowerCase() === 'asc' ? 1 : -1;
 
-    // Get all active feed sources
-    const feedSources = await RssFeed.find({ active: true });
-
-    if (!feedSources.length) {
-      return res.status(404).json({ message: 'No feed sources found' });
+    console.log(`Request for news with params:`, req.query);
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skipIndex = (page - 1) * limit;
+    const noShuffle = req.query.noShuffle === 'true';
+    
+    const feeds = await RssFeed.find({ active: true });
+    console.log(`Found ${feeds.length} active feeds`);
+    
+    if (feeds.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: [],
+        message: 'No active feeds found'
+      });
     }
-
-    // Fetch data from all feed sources in parallel
-    const feedPromises = feedSources.map(feed => fetchFeedData(feed.url));
-    const feedResults = await Promise.all(feedPromises);
-
-    // Combine and process all feed items
-    let allItems = [];
-    feedResults.forEach((items, index) => {
-      if (items && items.length) {
-        // Add source information to each item
-        const sourceName = feedSources[index].name;
-
-        const processedItems = items.map(item => ({
+    
+ 
+    const allItems = [];
+    const feedPromises = feeds.map(feed => fetchFeedData(feed.url, feed.name));
+    const results = await Promise.allSettled(feedPromises);
+    
+  
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled' && result.value && Array.isArray(result.value)) {
+        const feed = feeds[index];
+        const items = result.value.map(item => ({
           ...item,
-          source: sourceName,
-          date_published: item.date_published || new Date().toISOString()
+          source: feed.name,
+          sourceCategory: feed.category
         }));
-
-        allItems = [...allItems, ...processedItems];
+        allItems.push(...items);
+        console.log(`Added ${items.length} items from ${feed.name}`);
+      } else {
+        console.warn(`Failed to fetch or process feed ${feeds[index].name}: ${result.reason || 'No items returned'}`);
       }
     });
+    
 
-    // Filter items to include only those not more than 10 days old
-    const tenDaysAgo = new Date();
-    tenDaysAgo.setDate(tenDaysAgo.getDate() - 10);
+    console.log(`Total items before filtering: ${allItems.length}`);
+    
 
-    allItems = allItems.filter(item => {
-      const itemDate = new Date(item.date_published);
-      return itemDate >= tenDaysAgo;
+    const processedItems = allItems.map(item => {
+      if (!item.date_published) {
+        item.date_published = item.published || item.pubDate || new Date().toISOString();
+      }
+      return item;
     });
-
-    // Sort by date first (most recent first by default)
-    allItems.sort((a, b) => {
-      const dateA = new Date(a.date_published);
-      const dateB = new Date(b.date_published);
-      return sortOrder * (dateB - dateA);
+    
+    console.log(`Total items after processing: ${processedItems.length}`);
+  
+    processedItems.sort((a, b) => {
+      const dateA = new Date(a.date_published || new Date());
+      const dateB = new Date(b.date_published || new Date());
+      return dateB - dateA;
     });
+    
 
-    // Shuffle the items to break up author chunks
-    for (let i = allItems.length - 1; i > 0; i--) {
+    let shuffledItems = processedItems;
+    if (!noShuffle) {
+      for (let i = shuffledItems.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+        [shuffledItems[i], shuffledItems[j]] = [shuffledItems[j], shuffledItems[i]];
+      }
+      console.log('Items shuffled');
+    } else {
+      console.log('Shuffle disabled, returning sorted by date');
     }
-
-    // Calculate pagination values
-    const totalItems = allItems.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
-    const startIndex = (pageNum - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-
-    // Get items for the requested page
-    const paginatedItems = allItems.slice(startIndex, endIndex);
-
-    res.json({
-      count: totalItems,
-      currentPage: pageNum,
-      totalPages: totalPages,
-      pageSize: pageSize,
-      items: paginatedItems
+ 
+    const sourceCounts = {};
+    shuffledItems.forEach(item => {
+      sourceCounts[item.source] = (sourceCounts[item.source] || 0) + 1;
     });
+    console.log('Items by source:', sourceCounts);
+    
+    // Pagination
+    const totalCount = shuffledItems.length;
+    const paginatedItems = shuffledItems.slice(skipIndex, skipIndex + limit);
+    
+    res.status(200).json({
+      success: true,
+      count: totalCount,
+      page,
+      totalPages: Math.ceil(totalCount / limit),
+      data: paginatedItems
+    });
+    
   } catch (error) {
-    console.error('Error in getNews controller:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error fetching news:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error',
+      message: error.message
+    });
   }
 };
 
-/**
- * Get personalized news feeds based on user preferences
- * User preferences contain company names (e.g., "Tesla", "Meta", "Concordia University")
- * If user has no preferences, falls back to all news
- */
+
 const getPersonalizedNews = async (req, res) => {
   try {
     const { sort = 'desc', limit = 50 } = req.query;
     const sortOrder = sort.toLowerCase() === 'asc' ? 1 : -1;
 
-    // Get user preferences from authenticated user
+
     const userPreferences = req.user.preferences;
+    console.log('User preferences:', JSON.stringify(userPreferences));
 
     let feedSources;
 
-    // If user has preferences, filter feed sources by company name
     if (userPreferences && userPreferences.length > 0) {
+      console.log('Filtering feeds by preferences:', userPreferences);
+      
+      // Get all active feeds to log what's available
+      const allFeeds = await RssFeed.find({ active: true });
+      console.log('Available active feeds:', allFeeds.map(f => f.name));
+      
       feedSources = await RssFeed.find({
-        active: true,
+        active: true, // Changed from isActive to active
         name: { $in: userPreferences }
       });
+
+      console.log(`Found ${feedSources.length} feeds matching user preferences`);
+      console.log('Matched feeds:', feedSources.map(f => f.name));
 
       // If no feeds match preferences, return message
       if (!feedSources.length) {
         return res.status(404).json({
           message: 'No feed sources match your company preferences',
-          preferences: userPreferences
+          preferences: userPreferences,
+          available_feeds: allFeeds.map(f => f.name)
         });
       }
     } else {
       // If no preferences, get all active feed sources
+      console.log('No user preferences found, fetching all active feeds');
       feedSources = await RssFeed.find({ active: true });
-
       if (!feedSources.length) {
-        return res.status(404).json({ message: 'No feed sources found' });
+        return res.status(404).json({ 
+          message: 'No feed sources found',
+          available_feeds: [] 
+        });
       }
     }
 
     // Fetch data from all relevant feed sources in parallel
-    const feedPromises = feedSources.map(feed => fetchFeedData(feed.url));
+    const feedPromises = feedSources.map(feed => fetchFeedData(feed.url, feed.name));
     const feedResults = await Promise.all(feedPromises);
 
     // Combine and process all feed items
@@ -148,21 +306,33 @@ const getPersonalizedNews = async (req, res) => {
       if (items && items.length) {
         // Add source information to each item
         const sourceName = feedSources[index].name;
+        console.log(`Processing ${items.length} items from ${sourceName}`);
 
         const processedItems = items.map(item => ({
           ...item,
           source: sourceName,
-          date_published: item.date_published || new Date().toISOString()
+          date_published: item.date_published || item.published || item.pubDate || new Date().toISOString()
         }));
 
         allItems = [...allItems, ...processedItems];
+      } else {
+        console.log(`No items found for ${feedSources[index].name}`);
       }
     });
 
+    console.log(`Total personalized items: ${allItems.length}`);
+
+    // Count items by source before sorting
+    const sourceCounts = {};
+    allItems.forEach(item => {
+      sourceCounts[item.source] = (sourceCounts[item.source] || 0) + 1;
+    });
+    console.log('Personalized items by source:', sourceCounts);
+
     // Sort items by publication date
     allItems.sort((a, b) => {
-      const dateA = new Date(a.date_published);
-      const dateB = new Date(b.date_published);
+      const dateA = new Date(a.date_published || new Date());
+      const dateB = new Date(b.date_published || new Date());
       return sortOrder * (dateB - dateA);
     });
 
@@ -171,10 +341,12 @@ const getPersonalizedNews = async (req, res) => {
       allItems = allItems.slice(0, parseInt(limit));
     }
 
+    // Improve response with more debugging information
     res.json({
       count: allItems.length,
       personalized: userPreferences && userPreferences.length > 0,
       preferences: userPreferences,
+      feeds_matched: feedSources.map(f => f.name),
       items: allItems
     });
   } catch (error) {
@@ -183,12 +355,10 @@ const getPersonalizedNews = async (req, res) => {
   }
 };
 
-/**
- * Get all available companies that have RSS feeds
- */
+
 const getNewsCategories = async (req, res) => {
   try {
-    // Get names of all companies with active feeds
+    // Get names of all companies with active feeds - changed from active to active
     const companies = await RssFeed.distinct('name', { active: true });
 
     res.json({
@@ -200,17 +370,9 @@ const getNewsCategories = async (req, res) => {
   }
 };
 
-/**
- * Get a specific news item by ID
- * Note: Since RSS feeds don't typically provide a consistent ID system,
- * this implementation depends on how you handle IDs in your application
- */
 const getNewsById = async (req, res) => {
   try {
     const { id } = req.params;
-
-    // This is a placeholder implementation
-    // In a real app, you might store articles in a database or implement a more complex lookup
 
     res.status(501).json({
       message: 'Feature not implemented',
