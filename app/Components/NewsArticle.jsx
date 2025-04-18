@@ -13,8 +13,11 @@ import {
 } from "react-native";
 import moment from "moment";
 import Icon from "react-native-vector-icons/Ionicons"; // Make sure this is installed
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const NewsArticleDetail = ({ article, onGoBack }) => {
+  const [isBookmarked, setIsBookmarked] = React.useState(false);
+  
   // Function to get the author name
   const getAuthorName = () => {
     if (article?.authors && Array.isArray(article.authors) && article.authors.length > 0) {
@@ -27,6 +30,52 @@ export const NewsArticleDetail = ({ article, onGoBack }) => {
       }
     }
     return article?.source || "Unknown Author";
+  };
+  
+  // Check if article is bookmarked when component mounts
+  React.useEffect(() => {
+    checkIfBookmarked();
+  }, []);
+  
+  // Check if the article is bookmarked
+  const checkIfBookmarked = async () => {
+    try {
+      const storedBookmarks = await AsyncStorage.getItem('@bookmarked_articles');
+      if (storedBookmarks) {
+        const bookmarks = JSON.parse(storedBookmarks);
+        const articleId = article?.id || article?.guid;
+        setIsBookmarked(bookmarks.includes(articleId));
+      }
+    } catch (error) {
+      console.error("Error checking bookmarks:", error);
+    }
+  };
+  
+  // Toggle bookmark status
+  const toggleBookmark = async () => {
+    try {
+      const articleId = article?.id || article?.guid;
+      if (!articleId) return;
+      
+      const storedBookmarks = await AsyncStorage.getItem('@bookmarked_articles');
+      let bookmarks = storedBookmarks ? JSON.parse(storedBookmarks) : [];
+      
+      if (isBookmarked) {
+        // Remove bookmark
+        bookmarks = bookmarks.filter(id => id !== articleId);
+      } else {
+        // Add bookmark
+        bookmarks.push(articleId);
+      }
+      
+      // Save updated bookmarks
+      await AsyncStorage.setItem('@bookmarked_articles', JSON.stringify(bookmarks));
+      
+      // Update state
+      setIsBookmarked(!isBookmarked);
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+    }
   };
   
   // Get author initial for avatar
@@ -106,9 +155,16 @@ export const NewsArticleDetail = ({ article, onGoBack }) => {
         <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
           <Icon name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleShare} style={styles.shareButton}>
-          <Icon name="share-social-outline" size={22} color="#333" />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={toggleBookmark} style={styles.headerButton}>
+            <Text style={styles.bookmarkIcon}>
+              {isBookmarked ? '★' : '☆'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleShare} style={styles.headerButton}>
+            <Icon name="share-social-outline" size={22} color="#333" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.container}>
@@ -172,8 +228,17 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  shareButton: {
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerButton: {
     padding: 8,
+    marginLeft: 8,
+  },
+  bookmarkIcon: {
+    fontSize: 22,
+    color: "#333",
   },
   contentContainer: {
     padding: 16,

@@ -27,6 +27,7 @@ import {
   createStaticNavigation,
   useNavigation,
 } from "@react-navigation/native";
+import Toast from "react-native-toast-message";
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -40,12 +41,14 @@ const Feed = () => {
   const notificationListener = useRef();
   const navigation = useNavigation();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState("all"); // 'all' or 'preferred'
+  const [activeTab, setActiveTab] = useState("articles");
   const [userPreferences, setUserPreferences] = useState([]);
+  const [bookmarks, setBookmarks] = useState([]); // Store bookmarked articles
 
   const responseListener = useRef();
   const [data, setData] = useState([]); // All news data
   const [filteredData, setFilteredData] = useState([]); // Filtered news based on preferences
+  const [bookmarkedData, setBookmarkedData] = useState([]); // Bookmarked articles
   const [page, setPage] = useState(1); // Pagination
   const [hasMore, setHasMore] = useState(true); // If more data to fetch
   const [loading, setLoading] = useState(true);
@@ -53,6 +56,8 @@ const Feed = () => {
   const [selectedArticle, setSelectedArticle] = useState(null);
   const [refreshing, setRefreshing] = useState(false); // For pull-to-refresh
 
+  // Constants for bookmark storage
+  const BOOKMARK_STORAGE_KEY = 'bookmarks';
 
   const fetchUserPreferences = async () => {
     try {
@@ -444,8 +449,8 @@ const Feed = () => {
   };
 
   /**
-   * Switch between tabs (All/Preferred)
-   The tab to switch to ('all' or 'preferred')
+   * Switch between tabs (All/Preferred/Bookmarks)
+   * @param {string} tab - The tab to switch to ('all', 'preferred', or 'bookmarks')
    */
   const switchTab = (tab) => {
     if (tab === activeTab) return;
@@ -456,6 +461,14 @@ const Feed = () => {
       // Apply filtering when switching to preferred tab
       const filtered = filterPostsByPreferences(data, userPreferences);
       setFilteredData(filtered);
+    } else if (tab === 'bookmarks') {
+      // When switching to bookmarks tab, make sure we have updated bookmark data
+      if (data.length > 0) {
+        const bookmarkedItems = data.filter(item => 
+          bookmarks.includes(item.id || item.guid)
+        );
+        setBookmarkedData(bookmarkedItems);
+      }
     }
   };
 
@@ -473,6 +486,7 @@ const Feed = () => {
       });
 
     fetchUserPreferences();
+    loadBookmarks(); // Load bookmarks
     fetchData(1);
 
     return () => {
@@ -491,12 +505,130 @@ const Feed = () => {
     }
   }, [userPreferences]);
 
+  // Add this useEffect after the other useEffects
+  useEffect(() => {
+    // When data changes, update bookmarked data
+    if (data.length > 0 && bookmarks.length > 0) {
+      const bookmarkedItems = data.filter(item => 
+        bookmarks.includes(item.id || item.guid)
+      );
+      setBookmarkedData(bookmarkedItems);
+      
+      // If we're currently on the bookmarks tab, we need to refresh it
+      if (activeTab === 'bookmarks') {
+        switchTab('bookmarks');
+      }
+    }
+  }, [data, bookmarks]);
+
   const handleArticlePress = (article) => {
     setSelectedArticle(article);
   };
 
   const handleGoBack = () => {
     setSelectedArticle(null);
+  };
+
+  /**
+   * Loads bookmarks from AsyncStorage
+   */
+  const loadBookmarks = async () => {
+    try {
+      // Use consistent storage key
+      const storedBookmarks = await AsyncStorage.getItem(BOOKMARK_STORAGE_KEY);
+      if (storedBookmarks) {
+        const parsedBookmarks = JSON.parse(storedBookmarks);
+        setBookmarks(parsedBookmarks);
+        console.log(`Loaded ${parsedBookmarks.length} bookmarks from storage`);
+        
+        // If we already have data, filter it to show bookmarks
+        if (data.length > 0) {
+          const bookmarkedItems = data.filter(item => 
+            parsedBookmarks.includes(item.id || item.guid)
+          );
+          setBookmarkedData(bookmarkedItems);
+        }
+      } else {
+        setBookmarks([]);
+        setBookmarkedData([]);
+      }
+    } catch (error) {
+      console.error("Error loading bookmarks:", error);
+      setBookmarks([]);
+      setBookmarkedData([]);
+    }
+  };
+
+  /**
+   * Saves bookmarks to AsyncStorage
+   */
+  const saveBookmarks = async (newBookmarks) => {
+    try {
+      await AsyncStorage.setItem(BOOKMARK_STORAGE_KEY, JSON.stringify(newBookmarks));
+      console.log(`Saved ${newBookmarks.length} bookmarks to storage`);
+    } catch (error) {
+      console.error("Error saving bookmarks:", error);
+    }
+  };
+
+  /**
+   * Checks if an article is bookmarked
+   * @param {Object} article - The article to check
+   * @returns {boolean} - Whether the article is bookmarked
+   */
+  const isBookmarked = (article) => {
+    const articleId = article.id || article.guid;
+    return bookmarks.includes(articleId);
+  };
+
+  /**
+   * Toggles bookmark status for an article
+   * @param {Object} article - The article to bookmark/unbookmark
+   */
+  const handleBookmark = async (article) => {
+    const articleId = article.id || article.guid;
+    
+    try {
+      // Check if article is already bookmarked
+      const isBookmarked = bookmarks.includes(articleId);
+      let updatedBookmarks;
+      
+      if (isBookmarked) {
+        // Remove from bookmarks
+        updatedBookmarks = bookmarks.filter(id => id !== articleId);
+      } else {
+        // Add to bookmarks
+        updatedBookmarks = [...bookmarks, articleId];
+      }
+      
+      // Update state
+      setBookmarks(updatedBookmarks);
+      
+      // Save to AsyncStorage using consistent key
+      await saveBookmarks(updatedBookmarks);
+      
+      // Update bookmarked data
+      if (data.length > 0) {
+        const bookmarkedItems = data.filter(item => 
+          updatedBookmarks.includes(item.id || item.guid)
+        );
+        setBookmarkedData(bookmarkedItems);
+      }
+      
+      // Show feedback to user
+      Toast.show({
+        type: isBookmarked ? 'info' : 'success',
+        text1: isBookmarked ? 'Removed from bookmarks' : 'Added to bookmarks',
+        position: 'bottom',
+      });
+    } catch (error) {
+      console.error('Error updating bookmarks:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to update bookmarks',
+        position: 'bottom',
+      });
+    }
   };
 
   const renderItem = ({ item }) => {
@@ -607,7 +739,17 @@ const Feed = () => {
             <View style={[styles.sourceBadge, { backgroundColor: getSourceColor(item.source) }]}>
               <Text style={styles.sourceText}>{item.source || 'News'}</Text>
             </View>
-            <Text style={styles.itemDate}>{formatDate(item.date_published)}</Text>
+            <View style={styles.rightSourceRow}>
+              <TouchableOpacity 
+                onPress={() => handleBookmark(item)}
+                style={styles.bookmarkButton}
+              >
+                <Text style={styles.bookmarkIcon}>
+                  {isBookmarked(item) ? '★' : '☆'}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.itemDate}>{formatDate(item.date_published)}</Text>
+            </View>
           </View>
           
           {/* Main content layout */}
@@ -719,8 +861,13 @@ const Feed = () => {
     });
   };
 
+  // Update displayData to include bookmarkedData
   // Determine which data to display based on active tab
-  const displayData = activeTab === 'all' ? data : filteredData;
+  const displayData = activeTab === 'articles' 
+    ? data 
+    : activeTab === 'preferred' 
+      ? filteredData 
+      : bookmarkedData;
 
   return (
     <View style={styles.container}>
@@ -785,17 +932,17 @@ const Feed = () => {
             <TouchableOpacity
               style={[
                 styles.tab,
-                activeTab === 'all' && styles.activeTab
+                activeTab === 'articles' && styles.activeTab
               ]}
-              onPress={() => switchTab('all')}
+              onPress={() => switchTab('articles')}
             >
               <Text 
                 style={[
                   styles.tabText,
-                  activeTab === 'all' && styles.activeTabText
+                  activeTab === 'articles' && styles.activeTabText
                 ]}
               >
-                All News
+                Articles
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -812,6 +959,22 @@ const Feed = () => {
                 ]}
               >
                 My Preferences
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'bookmarks' && styles.activeTab
+              ]}
+              onPress={() => switchTab('bookmarks')}
+            >
+              <Text 
+                style={[
+                  styles.tabText,
+                  activeTab === 'bookmarks' && styles.activeTabText
+                ]}
+              >
+                Bookmarks
               </Text>
             </TouchableOpacity>
           </View>
@@ -846,12 +1009,16 @@ const Feed = () => {
                         <Text style={styles.emptyText}>
                           {activeTab === 'preferred' 
                             ? "No articles match your preferences" 
-                            : "No articles found"}
+                            : activeTab === 'bookmarks'
+                              ? "No bookmarks found"
+                              : "No articles found"}
                         </Text>
                         <Text style={styles.emptySubText}>
                           {activeTab === 'preferred'
                             ? "Try adding more preferences in Settings"
-                            : "Pull down to refresh"}
+                            : activeTab === 'bookmarks'
+                              ? "Add bookmarks by tapping the star icon"
+                              : "Pull down to refresh"}
                         </Text>
                       </View>
                     ) : null
@@ -973,7 +1140,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#1a73e8",
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#7f8c8d",
     fontWeight: "500",
   },
@@ -1158,6 +1325,18 @@ const styles = StyleSheet.create({
     color: "#7f8c8d",
     fontWeight: "500",
     marginLeft: 4,
+  },
+  rightSourceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  bookmarkButton: {
+    padding: 4,
+    marginRight: 8,
+  },
+  bookmarkIcon: {
+    fontSize: 18,
+    color: "#f39c12",
   },
 });
 
